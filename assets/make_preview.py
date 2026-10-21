@@ -67,13 +67,18 @@ def make_icon():
 
 
 def make_preview():
-    # ── الخلفية: الصورة نفسها واضحة (الصورة التانية) ──
+    # ── الصورة كاملة في النص + خلفية من الصورة نفسها (مبلّرة وغامقة) ──
     base = None
     if os.path.exists(PHOTO):
         try:
             ph = Image.open(PHOTO).convert("RGB")
-            # نملّي الكادر بالصورة (قص بسيط من الجوانب بس)
-            base = ImageOps.fit(ph, (W, H), method=Image.LANCZOS, centering=(0.5, 0.35))
+            # خلفية: الصورة مليانة الكادر ثم مبلّرة وغامقة
+            bg = ImageOps.fit(ph, (W, H), method=Image.LANCZOS)
+            bg = bg.filter(ImageFilter.GaussianBlur(42)).point(lambda p: int(p * 0.45))
+            # المقدمة: الصورة كاملة (من غير أي قص) في النص
+            fg = ImageOps.contain(ph, (W, H), method=Image.LANCZOS)
+            base = bg.copy()
+            base.paste(fg, ((W - fg.width) // 2, (H - fg.height) // 2))
         except Exception:
             base = None
 
@@ -89,29 +94,8 @@ def make_preview():
             except Exception:
                 pass
 
-    base = base.convert("RGBA")
-
-    # تعتيم خفيف تحت فوق عشان الكلام يبان
-    shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shade)
-    sd.rectangle([0, 0, W, 210], fill=(10, 6, 18, 150))
-    sd.rectangle([0, H - 150, W, H], fill=(10, 6, 18, 175))
-    base = Image.alpha_composite(base, shade)
-
-    d = ImageDraw.Draw(base, "RGBA")
-
-    # إطار
-    d.rounded_rectangle([16, 16, W - 17, H - 17], radius=32, outline=(255, 255, 255, 90), width=4)
-
-    # الاسم فوق
-    f_names = font(96)
-    center(d, "إبراهيم ❤ آية", f_names, 52, (255, 255, 255, 255), stroke=5, stroke_fill=(90, 10, 40, 230))
-
-    # الجملة تحت
-    f_line = font(46)
-    center(d, "قصة حب محفورة في قلبي للأبد 💌", f_line, H - 112, (255, 255, 255, 255), stroke=4, stroke_fill=(90, 10, 40, 220))
-
-    base.convert("RGB").save(OUT_PREVIEW, "JPEG", quality=90, optimize=True)
+    base = base.convert("RGB")
+    base.save(OUT_PREVIEW, "JPEG", quality=90, optimize=True)
     print("preview.jpg OK")
 
 
