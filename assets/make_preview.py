@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHOT = os.path.join(HERE, "..", "screenshot.png")          # صورة الموقع (اختياري)
-PHOTO = os.path.join(HERE, "images", "photo1.jpeg")        # صورتها
+PHOTO = os.path.join(HERE, "images", "photo1.jpeg")        # الصورة اللي بتظهر مع اللينك
 OUT_PREVIEW = os.path.join(HERE, "preview.jpg")
 OUT_ICON = os.path.join(HERE, "icon.png")
 
@@ -67,55 +67,49 @@ def make_icon():
 
 
 def make_preview():
-    base = gradient(W, H, (23, 12, 36), (6, 8, 20))
-
-    if os.path.exists(SHOT):
+    # ── الخلفية: الصورة نفسها واضحة (الصورة التانية) ──
+    base = None
+    if os.path.exists(PHOTO):
         try:
-            shot = Image.open(SHOT).convert("RGB")
-            shot = ImageOps.fit(shot, (W, H), method=Image.LANCZOS)
-            shot = shot.filter(ImageFilter.GaussianBlur(14))
-            base = Image.blend(base, shot, 0.35)
+            ph = Image.open(PHOTO).convert("RGB")
+            # نملّي الكادر بالصورة (قص بسيط من الجوانب بس)
+            base = ImageOps.fit(ph, (W, H), method=Image.LANCZOS, centering=(0.5, 0.35))
         except Exception:
-            pass
+            base = None
 
-    d = ImageDraw.Draw(base, "RGBA")
+    if base is None:
+        # لو الصورة مش موجودة، نرجع للخلفية القديمة
+        base = gradient(W, H, (23, 12, 36), (6, 8, 20))
+        if os.path.exists(SHOT):
+            try:
+                shot = Image.open(SHOT).convert("RGB")
+                shot = ImageOps.fit(shot, (W, H), method=Image.LANCZOS)
+                shot = shot.filter(ImageFilter.GaussianBlur(14))
+                base = Image.blend(base, shot, 0.35)
+            except Exception:
+                pass
 
-    # نجوم خفيفة
-    import random
-    random.seed(7)
-    for _ in range(140):
-        x, y = random.randint(0, W), random.randint(0, H)
-        r = random.choice([1, 1, 1, 2])
-        a = random.randint(60, 190)
-        d.ellipse([x, y, x + r, y + r], fill=(255, 255, 255, a))
+    base = base.convert("RGBA")
 
-    # هالة وردية
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    gd.ellipse([W / 2 - 300, -140, W / 2 + 300, 240], fill=(244, 63, 94, 90))
-    glow = glow.filter(ImageFilter.GaussianBlur(120))
-    base = Image.alpha_composite(base.convert("RGBA"), glow)
+    # تعتيم خفيف تحت فوق عشان الكلام يبان
+    shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shade)
+    sd.rectangle([0, 0, W, 210], fill=(10, 6, 18, 150))
+    sd.rectangle([0, H - 150, W, H], fill=(10, 6, 18, 175))
+    base = Image.alpha_composite(base, shade)
+
     d = ImageDraw.Draw(base, "RGBA")
 
     # إطار
-    d.rounded_rectangle([18, 18, W - 19, H - 19], radius=34, outline=(255, 255, 255, 60), width=3)
+    d.rounded_rectangle([16, 16, W - 17, H - 17], radius=32, outline=(255, 255, 255, 90), width=4)
 
-    # القلب
-    fh = font(150)
-    box = d.textbbox((0, 0), "❤", font=fh)
-    d.text(((W - (box[2] - box[0])) / 2 - box[0], 34), "❤", font=fh, fill=(244, 63, 94, 255))
+    # الاسم فوق
+    f_names = font(96)
+    center(d, "إبراهيم ❤ آية", f_names, 52, (255, 255, 255, 255), stroke=5, stroke_fill=(90, 10, 40, 230))
 
-    f_names = font(112)
-    center(d, "إبراهيم ❤ آية", f_names, 190, (255, 205, 220, 255), stroke=3, stroke_fill=(90, 10, 40, 255))
-
+    # الجملة تحت
     f_line = font(46)
-    center(d, "قصة حب محفورة في قلبي للأبد", f_line, 350, (235, 235, 245, 255))
-
-    f_sub = font(32)
-    center(d, "https://ibrahim-aya.vercel.app", f_sub, 450, (255, 150, 175, 255))
-
-    f_small = font(27)
-    center(d, "اضغطوا على اللينك وخشّوا بكلمة السر  ❤  LOVE", f_small, 530, (200, 200, 215, 255))
+    center(d, "قصة حب محفورة في قلبي للأبد 💌", f_line, H - 112, (255, 255, 255, 255), stroke=4, stroke_fill=(90, 10, 40, 220))
 
     base.convert("RGB").save(OUT_PREVIEW, "JPEG", quality=90, optimize=True)
     print("preview.jpg OK")
